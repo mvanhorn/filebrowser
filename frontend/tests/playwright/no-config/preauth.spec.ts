@@ -29,7 +29,10 @@ test("logout", async ({ browser }) => {
   await expect(page).toHaveTitle(/FileBrowser Quantum - Files - backend/);
   let cookies = await context.cookies();
   expect(cookies.find((c) => c.name === "filebrowser_quantum_jwt")?.value).toBeDefined();
+  const logoutResponsePromise = page.waitForResponse("**/api/auth/logout");
   await page.locator('button[aria-label="logout-button"]').click();
+  const logoutResponse = await logoutResponsePromise;
+  expect(await logoutResponse.json()).toEqual({ logoutUrl: "/login" });
   await page.waitForURL("**/login", { timeout: 2000 });
   await expect(page).toHaveTitle("FileBrowser Quantum - Login");
   cookies = await context.cookies();

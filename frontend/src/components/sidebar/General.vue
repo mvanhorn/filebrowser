@@ -197,8 +197,7 @@ export default {
           : '';
         sharePath = subPath ? `${shareBase}/${url.encodedPath(subPath)}` : shareBase;
       }
-      await auth.logout();
-      window.location.href = sharePath || '/login';
+      await auth.logout(sharePath);
     },
     beforeEnter(el) {
       el.style.maxHeight = '0';

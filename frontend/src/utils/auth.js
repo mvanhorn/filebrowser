@@ -61,7 +61,7 @@ export function generateRandomCode(length) {
   return code;
 }
 
-export async function logout() {
+export async function logout(redirectUrl) {
   try {
     const res = await fetch(getApiPath("auth/logout"), {
       method: "POST",
@@ -69,14 +69,11 @@ export async function logout() {
     });
     if (res.ok) {
       const data = await res.json();
-      let logoutUrl = data.logoutUrl;
       // Backend clears the cookie, but frontend does it as fail-safe cleanup
       document.cookie = "filebrowser_quantum_jwt=; expires=Thu, 01 Jan 1970 00:00:01 GMT; path=/";
       void mutations.setCurrentUser(null);
       // No need to clear state.jwt - cookie is the source of truth
-      if (!logoutUrl) {
-        logoutUrl = `${globalVars.baseURL}login`;
-      }
+      const logoutUrl = redirectUrl || data.logoutUrl || `${globalVars.baseURL}login`;
       // Add a small delay to ensure cookie deletion completes before redirect
       setTimeout(() => {
         window.location.href = logoutUrl;
