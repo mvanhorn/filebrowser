@@ -6,6 +6,93 @@ const copyDestLabel = (page: import("@playwright/test").Page) =>
 /** Matches `_docker/src/general/backend/server-config.yaml` source name. */
 const GENERAL_COPY_SOURCE = "playwright + files";
 
+for (const modifier of ['ctrlKey', 'metaKey']) {
+  test(`listing selection preserves ${modifier} clicks without keydown`, async({ page, checkForErrors }) => {
+    await page.goto("/files/");
+    await expect(page).toHaveTitle("Graham's Filebrowser - Files - playwright-files");
+    const first = page.locator('a[aria-label="file.tar.gz"]');
+    const second = page.locator('a[aria-label="myfolder"]');
+    const third = page.locator('a[aria-label="copyme.txt"]');
+    const selected = page.locator('.listing-item[aria-selected="true"]');
+
+    // Start on a child so the window click handler records the selection array.
+    await first.locator('.name span').click();
+    await expect(first).toHaveAttribute('aria-selected', 'true');
+    await expect(selected).toHaveCount(1);
+
+    // dispatchEvent sends a bubbling MouseEvent without synthesizing keydown.
+    await second.locator('.name span').dispatchEvent('click', { button: 0, bubbles: true, [modifier]: true });
+    await expect(first).toHaveAttribute('aria-selected', 'true');
+    await expect(second).toHaveAttribute('aria-selected', 'true');
+    await expect(selected).toHaveCount(2);
+    await expect(page.locator('#status-bar .status-info .button')).toHaveText('2');
+
+    await third.locator('.image-preview').first().dispatchEvent('click', { button: 0, bubbles: true, [modifier]: true });
+    await expect(first).toHaveAttribute('aria-selected', 'true');
+    await expect(second).toHaveAttribute('aria-selected', 'true');
+    await expect(third).toHaveAttribute('aria-selected', 'true');
+    await expect(selected).toHaveCount(3);
+    await expect(page.locator('#status-bar .status-info .button')).toHaveText('3');
+    checkForErrors();
+  });
+}
+
+test("listing selection toggles Control clicks and clears after release", async({ page, checkForErrors }) => {
+  await page.goto("/files/");
+  await expect(page).toHaveTitle("Graham's Filebrowser - Files - playwright-files");
+  const first = page.locator('a[aria-label="file.tar.gz"]');
+  const second = page.locator('a[aria-label="myfolder"]');
+  const third = page.locator('a[aria-label="copyme.txt"]');
+  const replacement = page.locator('a[aria-label="1file1.txt"]');
+  const selected = page.locator('.listing-item[aria-selected="true"]');
+
+  await first.locator('.name span').click();
+  await page.keyboard.down('Control');
+  try {
+    await second.locator('.name span').click();
+    await third.click({ position: { x: 1, y: 1 } });
+    await expect(first).toHaveAttribute('aria-selected', 'true');
+    await expect(second).toHaveAttribute('aria-selected', 'true');
+    await expect(third).toHaveAttribute('aria-selected', 'true');
+    await expect(selected).toHaveCount(3);
+
+    // ListingItem treats repeat clicks within 500 ms as opening the item.
+    await page.waitForTimeout(550);
+    await second.locator('.name span').click();
+    await expect(first).toHaveAttribute('aria-selected', 'true');
+    await expect(second).toHaveAttribute('aria-selected', 'false');
+    await expect(third).toHaveAttribute('aria-selected', 'true');
+    await expect(selected).toHaveCount(2);
+  } finally {
+    await page.keyboard.up('Control');
+  }
+
+  await replacement.locator('.name span').click();
+  await expect(replacement).toHaveAttribute('aria-selected', 'true');
+  await expect(first).toHaveAttribute('aria-selected', 'false');
+  await expect(third).toHaveAttribute('aria-selected', 'false');
+  await expect(selected).toHaveCount(1);
+
+  // Target the background directly, independent of the current row layout.
+  await page.locator('.listing-view-root').dispatchEvent('click', { button: 0, bubbles: true });
+  await expect(selected).toHaveCount(0);
+  checkForErrors();
+});
+
+test("listing selection preserves Shift ranges", async({ page, checkForErrors }) => {
+  await page.goto("/files/");
+  await expect(page).toHaveTitle("Graham's Filebrowser - Files - playwright-files");
+  const folders = page.locator('.folder-items .listing-item');
+  await expect(folders.nth(2)).toBeVisible();
+  await folders.nth(0).locator('.name span').click();
+  await folders.nth(2).locator('.name span').click({ modifiers: ['Shift'] });
+  await expect(folders.nth(0)).toHaveAttribute('aria-selected', 'true');
+  await expect(folders.nth(1)).toHaveAttribute('aria-selected', 'true');
+  await expect(folders.nth(2)).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.listing-item[aria-selected="true"]')).toHaveCount(3);
+  checkForErrors();
+});
+
 test("info from listing", async({ page, checkForErrors }) => {
   await page.goto("/files/");
   await expect(page).toHaveTitle("Graham's Filebrowser - Files - playwright-files");
